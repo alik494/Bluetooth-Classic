@@ -6,9 +6,11 @@
     <string name="bluetooth_not_supported">Bluetooth не поддерживается</string>
     <string name="stop_search">Остановить поиск</string>
     <string name="disconnect">Отключиться</string>
-    <string name="led_red">Красный светодиод</string>
+    <string name="led_red">Запись</string>
     <string name="connecting">Соединение...</string>
     <string name="please_wait">Подождите, пожалуйста...</string>
     <string name="green_led">Зеленый светодиод</string>
+    <string name="btn_send">Send message</string>
+    <string name="create_graph">create Graph</string>
 
 </resources>

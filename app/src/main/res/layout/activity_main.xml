@@ -19,7 +19,7 @@
         android:id="@+id/frame_message"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="visible">
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/tv_message"
@@ -64,48 +64,105 @@
 
     <RelativeLayout
         android:id="@+id/frameLedControls"
-        android:visibility="gone"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:visibility="gone">
 
         <Button
             android:id="@+id/btn_disconnect"
-            android:text="@string/disconnect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="30dp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:text="@string/disconnect" />
 
         <EditText
             android:id="@+id/et_console"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_below="@+id/btn_disconnect"
             android:layout_marginTop="8dp"
-            android:lines="4"
             android:editable="false"
             android:gravity="bottom"
-            android:scrollbars="vertical"
+            android:lines="4"
+            android:scrollbars="vertical" />
+
+        <Button
+            android:id="@+id/btn_create_graph"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/et_console"
+            android:layout_centerVertical="true"
+            android:text="@string/create_graph" />
+
+        <TextView
+            android:id="@+id/text_view_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/btn_create_graph"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true"
+            android:text="00:05"
+            android:textColor="@android:color/black"
+            android:textSize="60sp"
+            android:visibility="invisible" />
+
+        <com.jjoe64.graphview.GraphView
+
+            android:id="@+id/graphView"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_below="@+id/btn_create_graph"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+        </com.jjoe64.graphview.GraphView>
 
         <Switch
             android:id="@+id/switch_led_red"
-            android:text="@string/led_red"
-            android:layout_centerInParent="true"
-            android:textSize="18sp"
-            android:textColor="@color/color_red"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="@string/led_red"
+            android:textColor="@color/color_red"
+            android:textSize="18sp"
+            android:visibility="invisible" />
 
         <Switch
             android:id="@+id/switch_led_green"
-            android:layout_below="@+id/switch_led_red"
-            android:text="@string/green_led"
-            android:layout_marginTop="8dp"
-            android:layout_centerInParent="true"
-            android:textSize="18sp"
-            android:textColor="@color/color_green"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/switch_led_red"
+            android:layout_centerInParent="true"
+            android:layout_marginTop="8dp"
+            android:text="@string/green_led"
+            android:textColor="@color/color_green"
+            android:textSize="18sp"
+            android:visibility="invisible" />
+
+
+        <EditText
+            android:id="@+id/et_input_comand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/switch_led_green"
+            android:layout_marginTop="80dp"
+            android:gravity="bottom"
+            android:lines="4"
+            android:scrollbars="vertical"
+            android:text="start" />
+
+        <Button
+            android:id="@+id/btn_send_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/et_input_comand"
+
+            android:layout_centerVertical="true"
+            android:text="@string/btn_send" />
+
     </RelativeLayout>
 
 </LinearLayout>

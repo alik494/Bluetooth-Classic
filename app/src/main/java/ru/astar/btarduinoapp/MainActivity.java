@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -24,14 +25,22 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.widget.Scroller;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
+
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -42,22 +51,37 @@ public class MainActivity extends AppCompatActivity implements
         CompoundButton.OnCheckedChangeListener,
         AdapterView.OnItemClickListener,
         View.OnClickListener {
+    private static final long START_TIME_IN_MILLIS = 5000;
+    private long mTimeLeftInMillis = START_TIME_IN_MILLIS;
+    private TextView mTextViewCountDown;
+    private boolean mTimerRunning;
+    GraphView graph;
+
+    private static final String FILE_NAME = "testData";
+    int numberOfElements;
+
 
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
 
-    private static final int REQ_ENABLE_BT  = 10;
-    public static final int BT_BOUNDED      = 21;
-    public static final int BT_SEARCH       = 22;
+    private static final int REQ_ENABLE_BT = 10;
+    public static final int BT_BOUNDED = 21;
+    public static final int BT_SEARCH = 22;
 
-    public static final int LED_RED         = 30;
-    public static final int LED_GREEN       = 31;
+    public static final int LED_RED = 30;
+    public static final int LED_GREEN = 31;
 
     private FrameLayout frameMessage;
     private LinearLayout frameControls;
 
     private RelativeLayout frameLedControls;
     private Button btnDisconnect;
+    private Button btn_send_message;
+    private Button btn_create_graph;
+    private EditText et_input_comand;
+    private boolean record;
+    private MainActivity mCountDownTimer;
+
     private Switch switchRedLed;
     private Switch switchGreenLed;
     private EditText etConsole;
@@ -81,19 +105,26 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        frameMessage  = findViewById(R.id.frame_message);
+        frameMessage = findViewById(R.id.frame_message);
         frameControls = findViewById(R.id.frame_control);
 
-        switchEnableBt  = findViewById(R.id.switch_enable_bt);
+        switchEnableBt = findViewById(R.id.switch_enable_bt);
         btnEnableSearch = findViewById(R.id.btn_enable_search);
-        pbProgress      = findViewById(R.id.pb_progress);
-        listBtDevices   = findViewById(R.id.lv_bt_device);
+        pbProgress = findViewById(R.id.pb_progress);
+        listBtDevices = findViewById(R.id.lv_bt_device);
 
         frameLedControls = findViewById(R.id.frameLedControls);
-        btnDisconnect    = findViewById(R.id.btn_disconnect);
-        switchGreenLed   = findViewById(R.id.switch_led_green);
-        switchRedLed     = findViewById(R.id.switch_led_red);
-        etConsole        = findViewById(R.id.et_console);
+        btnDisconnect = findViewById(R.id.btn_disconnect);
+        switchGreenLed = findViewById(R.id.switch_led_green);
+        switchRedLed = findViewById(R.id.switch_led_red);
+        etConsole = findViewById(R.id.et_console);
+        btn_send_message = findViewById(R.id.btn_send_message);
+        btn_create_graph = findViewById(R.id.btn_create_graph);
+        et_input_comand = findViewById(R.id.et_input_comand);
+        mTextViewCountDown = findViewById(R.id.text_view_countdown);
+        graph = (GraphView) findViewById(R.id.graphView);
+
+
 
         switchEnableBt.setOnCheckedChangeListener(this);
         btnEnableSearch.setOnClickListener(this);
@@ -146,6 +177,64 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    public void save(String text) {
+        FileOutputStream fos = null;
+        try {
+            fos = openFileOutput(FILE_NAME , MODE_PRIVATE);
+            fos.write(text.getBytes());
+            Toast.makeText(this, "Saved to " + getFilesDir() + "/" + FILE_NAME,
+                    Toast.LENGTH_LONG).show();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+    int[][] readFile(){
+        int[][] intsAll = new int[30000][3];
+        int i =0;
+        FileInputStream fis = null;
+        BufferedReader br = null;
+        String data="";
+        StringBuilder sb=new StringBuilder();
+        try {
+            fis = openFileInput(FILE_NAME);
+            InputStreamReader isr = new InputStreamReader(fis);
+            br = new BufferedReader(isr);
+            while ((data = br.readLine()) != null) {
+//                sb.append(data).append("\n");
+                intsAll[i][0] = Integer.parseInt(data.split(" ")[0]);
+                intsAll[i][2] = Integer.parseInt(data.split(" ")[1]);
+//                intsAll[i][1] = Integer.parseInt(data.substring(6, 11));
+//                intsAll[i][2] = Integer.parseInt(data.substring(12, 17));
+                i++;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        numberOfElements=i;
+        return   intsAll;
+    }
+
+
     @Override
     public void onClick(View v) {
         if (v.equals(btnEnableSearch)) {
@@ -155,14 +244,24 @@ public class MainActivity extends AppCompatActivity implements
             if (connectedThread != null) {
                 connectedThread.cancel();
             }
-
             if (connectThread != null) {
                 connectThread.cancel();
             }
 
             showFrameControls();
+        } else if (v.equals(btn_send_message)) {
+            connectedThread.writeMesToBlu(et_input_comand.getText().toString());
+            et_input_comand.setText("");
+            etConsole.setText("");
+
+        } else if (v.equals(btn_create_graph)) {
+            String dataFromBl=etConsole.getText().toString();
+            save(dataFromBl);
+            graph.setVisibility(View.VISIBLE);
+            drawGraph();
         }
     }
+
 
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -255,7 +354,7 @@ public class MainActivity extends AppCompatActivity implements
         Set<BluetoothDevice> deviceSet = bluetoothAdapter.getBondedDevices();
         ArrayList<BluetoothDevice> tmpArrayList = new ArrayList<>();
         if (deviceSet.size() > 0) {
-            for (BluetoothDevice device: deviceSet) {
+            for (BluetoothDevice device : deviceSet) {
                 tmpArrayList.add(device);
             }
         }
@@ -304,7 +403,7 @@ public class MainActivity extends AppCompatActivity implements
      */
     private void accessLocationPermission() {
         int accessCoarseLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION);
-        int accessFineLocation   = this.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        int accessFineLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION);
 
         List<String> listRequestPermission = new ArrayList<String>();
 
@@ -371,7 +470,7 @@ public class MainActivity extends AppCompatActivity implements
                     @Override
                     public void run() {
                         progressDialog.dismiss();
-                        Toast.makeText(MainActivity.this, "Не могу соединиться!",Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Не могу соединиться!", Toast.LENGTH_SHORT).show();
                     }
                 });
 
@@ -404,11 +503,10 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private class ConnectedThread  extends  Thread {
+    private class ConnectedThread extends Thread {
 
         private final InputStream inputStream;
         private final OutputStream outputStream;
-
         private boolean isConnected = false;
 
         public ConnectedThread(BluetoothSocket bluetoothSocket) {
@@ -433,8 +531,6 @@ public class MainActivity extends AppCompatActivity implements
             StringBuffer buffer = new StringBuffer();
             final StringBuffer sbConsole = new StringBuffer();
             final ScrollingMovementMethod movementMethod = new ScrollingMovementMethod();
-
-
             while (isConnected) {
                 try {
                     int bytes = bis.read();
@@ -443,7 +539,6 @@ public class MainActivity extends AppCompatActivity implements
                     if (eof > 0) {
                         sbConsole.append(buffer.toString());
                         buffer.delete(0, buffer.length());
-
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
@@ -452,7 +547,6 @@ public class MainActivity extends AppCompatActivity implements
                             }
                         });
                     }
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -465,7 +559,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
 
-        public void write(String command) {
+        public void writeMesToBlu(String command) {
             byte[] bytes = command.getBytes();
             if (outputStream != null) {
                 try {
@@ -482,7 +576,7 @@ public class MainActivity extends AppCompatActivity implements
                 isConnected = false;
                 inputStream.close();
                 outputStream.close();
-            }catch (IOException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -494,14 +588,247 @@ public class MainActivity extends AppCompatActivity implements
 
             switch (led) {
                 case LED_RED:
-                    command = (state) ? "red on#" : "red off#";
+                    etConsole.setText("");
+                    record = state;
+//                    command = (state) ? "red on#" : "red off#";
                     break;
                 case LED_GREEN:
                     command = (state) ? "green on#" : "green off#";
                     break;
             }
 
-            connectedThread.write(command);
+//            connectedThread.write(command);
+        }
+    }
+    public double SaO2(double a) {
+        Log.i("saO2A", a + "");
+        double rez = (1.13 - (a / 3));
+        Log.i("saO2rez", rez + "");
+        return rez;
+    }
+
+    private double SaCO(double a) {
+        Log.i("saOA", a + "");
+        double rez = ((0.86 * a) - 0.72) * 0.1;
+        Log.i("saOrez", rez + "");
+        return rez;
+    }
+
+    public double aVidnosh(double sumX, double sumY, double sumXX, double sumXY) {
+        double rez = ((((sumX * sumY) - (200 * sumXY))) / ((sumX * sumX) - (200 * sumXX)));
+        Log.i("aVidnosh", rez + "");
+        return rez;
+    }
+
+    private double rOne(double sumX, double sumY, double sumXX, double sumXY, double sumYY) {
+        double rez = ((sumXY - ((sumX * sumY) / 200))) / ((Math.sqrt(sumXX - ((sumX * sumX) / 200))) * (Math.sqrt(sumYY - ((sumY * sumY) / 200))));
+        return rez + 1;
+    }
+
+    public int Xmax(int[][] ints) {
+        int XmaxInt = 0;
+        for (int i = 0; i < 200; i++) {
+            if (ints[i][0] > XmaxInt) {
+                XmaxInt = ints[i][0];
+            }
+        }
+        return XmaxInt;
+    }
+
+    public int Ymax(int[][] ints) {
+        int YmaxInt = 0;
+        for (int i = 0; i < 200; i++) {
+            if (ints[i][1] > YmaxInt) {
+                YmaxInt = ints[i][1];
+            }
+        }
+        return YmaxInt;
+    }
+
+    public double[][] XiAndYi(int[][] ints) {
+        double[][] XiAndYiDoubles = new double[200][2];
+        double Xmax = Xmax(ints);
+        double Ymax = Ymax(ints);
+        for (int i = 0; i < 200; i++) {
+            XiAndYiDoubles[i][0] = (double) ints[i][0] / Xmax;
+            XiAndYiDoubles[i][1] = (double) ints[i][1] / Ymax;
+        }
+        return XiAndYiDoubles;
+    }
+
+    public double[][] XXandXYandYY(double[][] doubles) {
+        double[][] XXandXYandYYDoubles = new double[200][3];
+        for (int i = 0; i < 200; i++) {
+            XXandXYandYYDoubles[i][0] = doubles[i][0] * doubles[i][0];
+            XXandXYandYYDoubles[i][1] = doubles[i][0] * doubles[i][1];
+            XXandXYandYYDoubles[i][2] = doubles[i][1] * doubles[i][1];
+        }
+        return XXandXYandYYDoubles;
+    }
+
+    public double sumX(double[][] XiAndYiDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XiAndYiDoubles[i][0];
+        }
+        return rez;
+    }
+
+    public double sumY(double[][] XiAndYiDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XiAndYiDoubles[i][1];
+        }
+        return rez;
+    }
+
+    public double sumXX(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][0];
+        }
+        return rez;
+    }
+
+    public double sumXY(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][1];
+        }
+        return rez;
+    }
+
+    public double sumYY(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][2];
+        }
+        return rez;
+    }
+
+    public double DiscoverSaO2(int[][] ints) {
+        double[][] XiAndYiDoubles = XiAndYi(ints);
+        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
+        double sumX = sumX(XiAndYiDoubles);
+        double sumY = sumY(XiAndYiDoubles);
+        double sumXX = sumXX(XXandXYandYYDoubles);
+        double sumXY = sumXY(XXandXYandYYDoubles);
+        double sumYY = sumYY(XXandXYandYYDoubles);
+        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
+        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+        Log.i("r1_test", r1 + "");
+        Log.i("saO2Discover", SaO2(a) + "");
+        Log.i("aSao2", a + " ");
+        Log.i("r1Sao2", r1 + " ");
+        Log.i("arLeSao2", XXandXYandYYDoubles.length + " ");
+        if (r1 >= .99) {
+            return SaO2(a);
+        } else
+            return 0;
+    }
+
+    public double DiscoverSaCo(int[][] ints) {
+        double[][] XiAndYiDoubles = XiAndYi(ints);
+        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
+        double sumX = sumX(XiAndYiDoubles);
+        double sumY = sumY(XiAndYiDoubles);
+        double sumXX = sumXX(XXandXYandYYDoubles);
+        double sumXY = sumXY(XXandXYandYYDoubles);
+        double sumYY = sumYY(XXandXYandYYDoubles);
+        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
+        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+        Log.i("r1_Saco", r1 + "");
+        Log.i("a1_Saco", a + "");
+        Log.i("sumX1_Saco", sumX + "");
+        if (r1 >= .98) {
+            Log.i("saCo", SaCO(a) + "");
+            return SaCO(a);
+        } else return 0;
+    }
+
+
+
+
+
+    public  void drawGraph() {
+//        String path =getFilesDir().toString();
+//        Log.d("Files", "Path: " + path);
+//        File directory = new File(path);
+//        File[] files = directory.listFiles();
+//        Log.d("Files", "Size: "+ files.length);
+//        for (int i = 0; i < files.length; i++)
+//        {
+//            Log.d("Files", "FileName:" + files[i].getName());
+//        }
+//
+        int [][] intsAll=readFile();
+        int i=numberOfElements;
+
+        double[] doublesSo2 = new double[i / 200];
+        int[][] ints = new int[200][2];
+        for (int j = 0; j < i / 200; j++) {
+            for (int k = 0; k < 200; k++) {
+                ints[k][0] = intsAll[k + j * 200][0];
+                ints[k][1] = intsAll[k + j * 200][2];
+            }
+            doublesSo2[j] = (DiscoverSaO2(ints));
+            Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
+            if (doublesSo2[j] == 0) {
+                if (j > 1) {
+                    doublesSo2[j] = doublesSo2[j - 1];
+                }
+            }
+//            Log.i("doublesSo2DrawGraphAfter", doublesSo2[j] + "");
+        }
+
+        double[] doublesSaCO = new double[i / 200];
+        int[][] ints2 = new int[200][2];
+        for (int j = 0; j < i / 200; j++) {
+            for (int k = 0; k < 200; k++) {
+                ints2[k][0] = intsAll[k + j * 200][1];
+                ints2[k][1] = intsAll[k + j * 200][2];
+            }
+            doublesSaCO[j] = (DiscoverSaCo(ints2));
+            Log.i("doublesSaCODrawGraph", doublesSaCO[j] + "");
+            if (doublesSaCO[j] == 0) {
+                if (j > 1) {
+                    doublesSaCO[j] = doublesSaCO[j - 1];
+                }
+            }
+//            Log.i("doublesSaCODrawGraphAfter", doublesSaCO[j] + "");
+        }
+//        textViewArray.setText("");
+
+        graph.setVisibility(View.VISIBLE);
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
+        LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
+        int size = doublesSo2.length;
+        for (int i2 = 10; i2 < size; i2++) {
+            DataPoint point = new DataPoint(i2, doublesSo2[i2] * 100);
+            series.appendData(point, true, size);
+        }
+        for (int i2 = 10; i2 < size; i2++) {
+            DataPoint pointF = new DataPoint(i2, doublesSaCO[i2] * 100);
+            series2.appendData(pointF, true, size);
+        }
+        graph.getViewport().setMinX(10  );
+        graph.getViewport().setMaxX(size);
+        graph.getViewport().setMinY(-10);
+        graph.getViewport().setMaxY(110);
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setXAxisBoundsManual(true);
+        series.setColor(Color.BLACK);
+        series2.setColor(Color.RED);
+        graph.addSeries(series);
+        graph.addSeries(series2);
+        double sred=0;
+        for (int l=0;l<doublesSaCO.length;l++){
+            sred+=doublesSaCO[l];
+        }
+        sred=sred/doublesSaCO.length;
+        Log.i("sredCheck",sred+"");
+        if (sred>0.10) {
+            Toast.makeText(this,"Терміново к доктору", Toast.LENGTH_LONG).show();
         }
     }
 }

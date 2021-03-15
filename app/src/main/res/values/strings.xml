@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BtArduinoApp</string>
+    <string name="app_name">BluetoothHelper</string>
     <string name="bluetooth_on_off">Вкл./Выкл. Bluetooth</string>
     <string name="bluetooth_off">Bluetooth выключен</string>
     <string name="start_search">Начать поиск</string>
@@ -12,5 +12,7 @@
     <string name="green_led">Зеленый светодиод</string>
     <string name="btn_send">Send message</string>
     <string name="create_graph">create Graph</string>
+    <string name="succ_send">Mess succ send</string>
+
 
 </resources>

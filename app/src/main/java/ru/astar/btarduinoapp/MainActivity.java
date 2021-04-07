@@ -769,7 +769,7 @@ public class MainActivity extends AppCompatActivity implements
         LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
         LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
         int size = doublesSo2.length;
-        for (int i2 = 10; i2 < size; i2++) {
+        for (int i2 = 1; i2 < size; i2++) {
             DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
             series.appendData(point, true, size);
         }
@@ -782,12 +782,13 @@ public class MainActivity extends AppCompatActivity implements
         series.setColor(Color.RED);
         graph.addSeries(series);
         double sred = 0;
-        for (int l = 0; l < doublesSo2.length; l++) {
-            sred += doublesSo2[l];
+        for (int l = 0; l < size; l++) {
+            sred += listSo2.get(l);
         }
         sred = sred / doublesSo2.length;
         Log.i("sredCheck", sred + "");
         Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
+        etConsole.setText("So2 = "+sred);
     }
 }
 

@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
-    public static boolean isTest = true;
+    public static boolean isTest = false;
 
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
@@ -770,7 +770,7 @@ public class MainActivity extends AppCompatActivity implements
         LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
         int size = doublesSo2.length;
         for (int i2 = 10; i2 < size; i2++) {
-            DataPoint point = new DataPoint(i2, doublesSo2[i2] * 100);
+            DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
             series.appendData(point, true, size);
         }
         graph.getViewport().setMinX(10);

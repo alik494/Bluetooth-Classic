@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
-    public static boolean isTest = false;
+    public static boolean isTest = true;
 
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
@@ -85,6 +85,7 @@ public class MainActivity extends AppCompatActivity implements
     private Switch switchRedLed;
     private Switch switchGreenLed;
     private EditText etConsole;
+    private StringBuffer sbgolbal;
 
     private Switch switchEnableBt;
     private Button btnEnableSearch;
@@ -178,7 +179,8 @@ public class MainActivity extends AppCompatActivity implements
         btn_create_graph.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String dataFromBl = etConsole.getText().toString();
+//                String dataFromBl = etConsole.getText().toString();
+                String dataFromBl=sbgolbal.toString();
                 save(dataFromBl);
                 graph.setVisibility(View.VISIBLE);
                 drawGraph();
@@ -559,7 +561,8 @@ public class MainActivity extends AppCompatActivity implements
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                etConsole.setText(sbConsole.toString());
+                                 sbgolbal = sbConsole;
+//                                etConsole.setText(sbConsole.toString());
                                 etConsole.setMovementMethod(movementMethod);
                             }
                         });

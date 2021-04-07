@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.support.annotation.Nullable;
@@ -105,7 +106,7 @@ public class MainActivity extends AppCompatActivity implements
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         frameMessage = findViewById(R.id.frame_message);
         frameControls = findViewById(R.id.frame_control);
 
@@ -171,6 +172,7 @@ public class MainActivity extends AppCompatActivity implements
                     etConsole.setText("");
                     if (isTest) {
                         etConsole.setText(readStringFromTestLog());
+                        sbgolbal=new StringBuffer(readStringFromTestLog());
                     }
                 }
             }
@@ -758,17 +760,15 @@ public class MainActivity extends AppCompatActivity implements
             }
             doublesSo2[j] = (DiscoverSaO2(ints));
             Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
-            if (doublesSo2[j] == 0) {
+            if (doublesSo2[j] != 0) {
                 if (j > 1) {
-                    listSo2.add(doublesSo2[j - 1]);
-                    doublesSo2[j] = doublesSo2[j - 1];
+                    listSo2.add(doublesSo2[j ]);
                 }
             }
         }
         graph.setVisibility(View.VISIBLE);
         LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
-        LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
-        int size = doublesSo2.length;
+        int size = listSo2.size();
         for (int i2 = 1; i2 < size; i2++) {
             DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
             series.appendData(point, true, size);

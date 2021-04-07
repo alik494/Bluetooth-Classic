@@ -47,7 +47,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class    MainActivity extends AppCompatActivity implements
+public class MainActivity extends AppCompatActivity implements
         CompoundButton.OnCheckedChangeListener,
         AdapterView.OnItemClickListener,
         View.OnClickListener {
@@ -60,9 +60,9 @@ public class    MainActivity extends AppCompatActivity implements
     private static final String FILE_NAME = "testData";
     int numberOfElements;
 
-
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
+    public static boolean isTest = false;
 
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
@@ -160,7 +160,6 @@ public class    MainActivity extends AppCompatActivity implements
             setListAdapter(BT_BOUNDED);
         }
 
-
         btn_send_message.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -169,6 +168,9 @@ public class    MainActivity extends AppCompatActivity implements
                     Toast.makeText(MainActivity.this, R.string.succ_send, Toast.LENGTH_SHORT).show();
                     et_input_comand.setText("");
                     etConsole.setText("");
+                    if (isTest) {
+                        etConsole.setText(readStringFromTestLog());
+                    }
                 }
             }
         });
@@ -188,16 +190,38 @@ public class    MainActivity extends AppCompatActivity implements
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
         unregisterReceiver(receiver);
-
         if (connectThread != null) {
             connectThread.cancel();
         }
-
         if (connectedThread != null) {
             connectedThread.cancel();
         }
+    }
+
+    public String readStringFromTestLog() {
+        FileInputStream fis = null;
+        BufferedReader br = null;
+        String data = "";
+        StringBuilder sb = new StringBuilder();
+        try {
+            InputStream isr = this.getResources().openRawResource(R.raw.log);
+            br = new BufferedReader(new InputStreamReader(isr));
+            while ((data = br.readLine()) != null) {
+                sb.append(data).append("\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return sb.toString();
     }
 
     public void save(String text) {
@@ -224,49 +248,37 @@ public class    MainActivity extends AppCompatActivity implements
 
 
     int[][] readFile() {
-        int[][] intsAll=null ;
+        int[][] intsAll = null;
         int i = 0;
-        String [] dataAr=new String [2];
+        String[] dataAr = new String[2];
         FileInputStream fis = null;
         BufferedReader br = null;
-        List<String > list=new ArrayList();
-//        InputStreamReader isr=null;
-        InputStreamReader isr=null;
+        List<String> list = new ArrayList();
+        InputStreamReader isr = null;
         String data = "";
-        StringBuilder sb=new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         try {
             fis = openFileInput(FILE_NAME);
-             isr = new InputStreamReader(fis);
+            isr = new InputStreamReader(fis);
             br = new BufferedReader(isr);
-
-//             isr = this.getResources().openRawResource(R.raw.log);
-//            br = new BufferedReader(new InputStreamReader(isr));
-
             while ((data = br.readLine()) != null) {
                 i++;
                 list.add(data);
             }
-
-//
-
-//             isr = this.getResources().openRawResource(R.raw.log);
-//            br = new BufferedReader(new InputStreamReader(isr));
-
-
-            intsAll = new int[i+1][2];
-            int j=0;
-            while (j<i-1) {
-                data=list.get(j);
+            intsAll = new int[i + 1][2];
+            int j = 0;
+            while (j < i - 1) {
+                data = list.get(j);
                 sb.append(data).append("\n");
-                dataAr=data.split(" ");
+                dataAr = data.split(" ");
                 intsAll[j][0] = Integer.parseInt(dataAr[0]);
                 intsAll[j][1] = Integer.parseInt(dataAr[1]);
                 j++;
             }
-            Toast.makeText(this, "Readed lines "+j + getFilesDir() + "/" + FILE_NAME,
+            Toast.makeText(this, "Readed lines " + j + getFilesDir() + "/" + FILE_NAME,
                     Toast.LENGTH_LONG).show();
         } catch (IOException e) {
-            Toast.makeText(this,"e"+e,Toast.LENGTH_LONG);
+            Toast.makeText(this, "e" + e, Toast.LENGTH_LONG);
             e.printStackTrace();
         } finally {
             if (fis != null) {
@@ -277,7 +289,6 @@ public class    MainActivity extends AppCompatActivity implements
                 }
             }
         }
-//        save(sb.toString());
         numberOfElements = i;
         return intsAll;
     }
@@ -288,7 +299,6 @@ public class    MainActivity extends AppCompatActivity implements
         if (v.equals(btnEnableSearch)) {
             enableSearch();
         } else if (v.equals(btnDisconnect)) {
-            // TODO отключение от устройства
             if (connectedThread != null) {
                 connectedThread.cancel();
             }
@@ -298,7 +308,6 @@ public class    MainActivity extends AppCompatActivity implements
             showFrameControls();
         }
     }
-
 
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -319,14 +328,6 @@ public class    MainActivity extends AppCompatActivity implements
             if (!isChecked) {
                 showFrameMessage();
             }
-        } else if (buttonView.equals(switchRedLed)) {
-            // TODO включение или отключение красного светодиода
-            enableLed(LED_RED, isChecked);
-
-        } else if (buttonView.equals(switchGreenLed)) {
-            // TODO включение или отключение зеленого светодиода
-            enableLed(LED_GREEN, isChecked);
-
         }
     }
 
@@ -373,16 +374,6 @@ public class    MainActivity extends AppCompatActivity implements
 
         bluetoothDevices.clear();
         int iconType = R.drawable.ic_bluetooth_bounded_device;
-
-        switch (type) {
-            case BT_BOUNDED:
-                bluetoothDevices = getBoundedBtDevices();
-                iconType = R.drawable.ic_bluetooth_bounded_device;
-                break;
-            case BT_SEARCH:
-                iconType = R.drawable.ic_bluetooth_search_device;
-                break;
-        }
         listAdapter = new BtListAdapter(this, bluetoothDevices, iconType);
         listBtDevices.setAdapter(listAdapter);
     }
@@ -397,7 +388,6 @@ public class    MainActivity extends AppCompatActivity implements
         }
         return tmpArrayList;
     }
-
 
     private void enableSearch() {
         if (bluetoothAdapter.isDiscovering()) {
@@ -434,9 +424,6 @@ public class    MainActivity extends AppCompatActivity implements
         }
     };
 
-    /**
-     * Запрос на разрешение данных о местоположении (для Marshmallow 6.0)
-     */
     private void accessLocationPermission() {
         int accessCoarseLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION);
         int accessFineLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION);
@@ -467,7 +454,6 @@ public class    MainActivity extends AppCompatActivity implements
                             return;
                         }
                     }
-                    //TODO - Add your code here to start Discovery
                 }
                 break;
             default:
@@ -506,7 +492,6 @@ public class    MainActivity extends AppCompatActivity implements
                         Toast.makeText(MainActivity.this, "Не могу соединиться!", Toast.LENGTH_SHORT).show();
                     }
                 });
-
                 cancel();
             }
             if (success) {
@@ -614,28 +599,9 @@ public class    MainActivity extends AppCompatActivity implements
         }
     }
 
-    private void enableLed(int led, boolean state) {
-        if (connectedThread != null && connectThread.isConnect()) {
-            String command = "";
-
-            switch (led) {
-                case LED_RED:
-                    etConsole.setText("");
-                    record = state;
-//                    command = (state) ? "red on#" : "red off#";
-                    break;
-                case LED_GREEN:
-                    command = (state) ? "green on#" : "green off#";
-                    break;
-            }
-
-//            connectedThread.write(command);
-        }
-    }
-
     public double SaO2(double a) {
         Log.i("saO2A", a + "");
-        double rez = (1.03 - (a / 3));
+        double rez = (1.13 - (a / 3));
         Log.i("saO2rez", rez + "");
         return rez;
     }
@@ -749,15 +715,10 @@ public class    MainActivity extends AppCompatActivity implements
         double sumYY = sumYY(XXandXYandYYDoubles);
         double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
         double a = aVidnosh(sumX, sumY, sumXX, sumXY);
-        Log.i("r1_test", r1 + "");
-        Log.i("saO2Discover", SaO2(a) + "");
-        Log.i("aSao2", a + " ");
-        Log.i("r1Sao2", r1 + " ");
-        Log.i("arLeSao2", XXandXYandYYDoubles.length + " ");
-//        if (r1 >= .99) {
+        if (r1 >= .99) {
             return SaO2(a);
-//        } else
-//            return 0;
+        } else
+            return 0;
     }
 
     public double DiscoverSaCo(int[][] ints) {
@@ -781,22 +742,12 @@ public class    MainActivity extends AppCompatActivity implements
 
 
     public void drawGraph() {
-//        String path =getFilesDir().toString();
-//        Log.d("Files", "Path: " + path);
-//        File directory = new File(path);
-//        File[] files = directory.listFiles();
-//        Log.d("Files", "Size: "+ files.length);
-//        for (int i = 0; i < files.length; i++)
-//        {
-//            Log.d("Files", "FileName:" + files[i].getName());
-//        }
-//
         int[][] intsAll = readFile();
         int i = numberOfElements;
 
         double[] doublesSo2 = new double[i / 200];
         int[][] ints = new int[200][2];
-        List <Double> listSo2=new ArrayList();
+        List<Double> listSo2 = new ArrayList();
         for (int j = 0; j < i / 200; j++) {
             for (int k = 0; k < 200; k++) {
                 ints[k][0] = intsAll[k + j * 200][0];
@@ -806,32 +757,11 @@ public class    MainActivity extends AppCompatActivity implements
             Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
             if (doublesSo2[j] == 0) {
                 if (j > 1) {
-                    listSo2.add( doublesSo2[j - 1]);
+                    listSo2.add(doublesSo2[j - 1]);
                     doublesSo2[j] = doublesSo2[j - 1];
                 }
             }
-
-//            Log.i("doublesSo2DrawGraphAfter", doublesSo2[j] + "");
         }
-
-//        double[] doublesSaCO = new double[i / 200];
-//        int[][] ints2 = new int[200][2];
-//        for (int j = 0; j < i / 200; j++) {
-//            for (int k = 0; k < 200; k++) {
-//                ints2[k][0] = intsAll[k + j * 200][1];
-//                ints2[k][1] = intsAll[k + j * 200][2];
-//            }
-//            doublesSaCO[j] = (DiscoverSaCo(ints2));
-//            Log.i("doublesSaCODrawGraph", doublesSaCO[j] + "");
-//            if (doublesSaCO[j] == 0) {
-//                if (j > 1) {
-//                    doublesSaCO[j] = doublesSaCO[j - 1];
-//                }
-//            }
-////            Log.i("doublesSaCODrawGraphAfter", doublesSaCO[j] + "");
-//        }
-//        textViewArray.setText("");
-
         graph.setVisibility(View.VISIBLE);
         LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
         LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
@@ -840,10 +770,6 @@ public class    MainActivity extends AppCompatActivity implements
             DataPoint point = new DataPoint(i2, doublesSo2[i2] * 100);
             series.appendData(point, true, size);
         }
-//        for (int i2 = 10; i2 < size; i2++) {
-//            DataPoint pointF = new DataPoint(i2, doublesSaCO[i2] * 100);
-//            series2.appendData(pointF, true, size);
-//        }
         graph.getViewport().setMinX(10);
         graph.getViewport().setMaxX(size);
         graph.getViewport().setMinY(-10);
@@ -851,18 +777,14 @@ public class    MainActivity extends AppCompatActivity implements
         graph.getViewport().setYAxisBoundsManual(true);
         graph.getViewport().setXAxisBoundsManual(true);
         series.setColor(Color.RED);
-//        series2.setColor(Color.RED);
         graph.addSeries(series);
-//        graph.addSeries(series2);
         double sred = 0;
         for (int l = 0; l < doublesSo2.length; l++) {
             sred += doublesSo2[l];
         }
         sred = sred / doublesSo2.length;
         Log.i("sredCheck", sred + "");
-        Toast.makeText(this, "среднее "+sred, Toast.LENGTH_LONG).show();
-//        if (sred > 0.10) {
-//            Toast.makeText(this, "среднее "+sred, Toast.LENGTH_LONG).show();
-//        }
+        Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
     }
 }
+

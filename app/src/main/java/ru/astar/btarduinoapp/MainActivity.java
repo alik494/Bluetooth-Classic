@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
-    public static boolean isTest = false;
+    public static boolean isTest = true;
 
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
@@ -720,6 +720,8 @@ public class MainActivity extends AppCompatActivity implements
         double sumYY = sumYY(XXandXYandYYDoubles);
         double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
         double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+
+        Log.i("rd1", r1+ "");
         if (r1 >= .99) {
             return SaO2(a);
         } else
@@ -762,18 +764,19 @@ public class MainActivity extends AppCompatActivity implements
             Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
             if (doublesSo2[j] != 0) {
                 if (j > 1) {
-                    listSo2.add(doublesSo2[j ]);
+                    listSo2.add(doublesSo2[j]);
+                    Log.i("listSo2addl", doublesSo2[j] + "");
                 }
             }
         }
         graph.setVisibility(View.VISIBLE);
         LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
         int size = listSo2.size();
-        for (int i2 = 1; i2 < size; i2++) {
+        for (int i2 = 0; i2 < size; i2++) {
             DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
             series.appendData(point, true, size);
         }
-        graph.getViewport().setMinX(10);
+        graph.getViewport().setMinX(0);
         graph.getViewport().setMaxX(size);
         graph.getViewport().setMinY(-10);
         graph.getViewport().setMaxY(110);
@@ -785,10 +788,15 @@ public class MainActivity extends AppCompatActivity implements
         for (int l = 0; l < size; l++) {
             sred += listSo2.get(l);
         }
-        sred = sred / doublesSo2.length;
+        sred = sred / size;
         Log.i("sredCheck", sred + "");
+        StringBuffer stringBuffer=new StringBuffer();
+        for (int i2 = 0; i2 < size; i2++) {
+           stringBuffer.append(listSo2.get(i2)).append("\n");
+        }
+        stringBuffer.append("So2 mid= "+sred);
+        etConsole.setText(stringBuffer.toString());
         Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
-        etConsole.setText("So2 = "+sred);
     }
 }
 

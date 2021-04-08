@@ -11,9 +11,9 @@ import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
@@ -52,54 +52,40 @@ public class MainActivity extends AppCompatActivity implements
         CompoundButton.OnCheckedChangeListener,
         AdapterView.OnItemClickListener,
         View.OnClickListener {
-    private static final long START_TIME_IN_MILLIS = 5000;
-    private long mTimeLeftInMillis = START_TIME_IN_MILLIS;
-    private TextView mTextViewCountDown;
-    private boolean mTimerRunning;
-    GraphView graph;
-
-    private static final String FILE_NAME = "testData";
-    int numberOfElements;
-
-    private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
+    private static final long START_TIME_IN_MILLIS = 5000;
+    private GraphView graph;
+    int numberOfElements;
+    private static final String TAG = MainActivity.class.getSimpleName();
+    //перемикач для читання тестового лог файлу
     public static boolean isTest = true;
+    //назва файлу який свториться після отримання даних по блютуз каналу
+    private static final String FILE_NAME = "logFileFromBlueTooth";
 
+    //початок інінціалізаціїї
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
     public static final int BT_SEARCH = 22;
-
-    public static final int LED_RED = 30;
-    public static final int LED_GREEN = 31;
-
     private FrameLayout frameMessage;
     private LinearLayout frameControls;
-
     private RelativeLayout frameLedControls;
     private Button btnDisconnect;
     private Button btn_send_message;
     private Button btn_create_graph;
     private EditText et_input_comand;
-    private boolean record;
-    private MainActivity mCountDownTimer;
-
     private Switch switchRedLed;
     private Switch switchGreenLed;
     private EditText etConsole;
     private StringBuffer sbgolbal;
-
     private Switch switchEnableBt;
     private Button btnEnableSearch;
     private ProgressBar pbProgress;
     private ListView listBtDevices;
-
     private BluetoothAdapter bluetoothAdapter;
     private BtListAdapter listAdapter;
     private ArrayList<BluetoothDevice> bluetoothDevices;
-
     private ConnectThread connectThread;
     private ConnectedThread connectedThread;
-
     private ProgressDialog progressDialog;
 
     @Override
@@ -109,12 +95,10 @@ public class MainActivity extends AppCompatActivity implements
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         frameMessage = findViewById(R.id.frame_message);
         frameControls = findViewById(R.id.frame_control);
-
         switchEnableBt = findViewById(R.id.switch_enable_bt);
         btnEnableSearch = findViewById(R.id.btn_enable_search);
         pbProgress = findViewById(R.id.pb_progress);
         listBtDevices = findViewById(R.id.lv_bt_device);
-
         frameLedControls = findViewById(R.id.frameLedControls);
         btnDisconnect = findViewById(R.id.btn_disconnect);
         switchGreenLed = findViewById(R.id.switch_led_green);
@@ -123,45 +107,37 @@ public class MainActivity extends AppCompatActivity implements
         btn_send_message = findViewById(R.id.btn_send_message);
         btn_create_graph = findViewById(R.id.btn_create_graph);
         et_input_comand = findViewById(R.id.et_input_comand);
-        mTextViewCountDown = findViewById(R.id.text_view_countdown);
         graph = (GraphView) findViewById(R.id.graphView);
-
-
         switchEnableBt.setOnCheckedChangeListener(this);
         btnEnableSearch.setOnClickListener(this);
         listBtDevices.setOnItemClickListener(this);
-
         btnDisconnect.setOnClickListener(this);
         switchGreenLed.setOnCheckedChangeListener(this);
         switchRedLed.setOnCheckedChangeListener(this);
-
         bluetoothDevices = new ArrayList<>();
-
         progressDialog = new ProgressDialog(this);
         progressDialog.setCancelable(false);
         progressDialog.setTitle(getString(R.string.connecting));
         progressDialog.setMessage(getString(R.string.please_wait));
-
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         registerReceiver(receiver, filter);
-
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
         if (bluetoothAdapter == null) {
             Toast.makeText(this, R.string.bluetooth_not_supported, Toast.LENGTH_SHORT).show();
             Log.d(TAG, "onCreate: " + getString(R.string.bluetooth_not_supported));
             finish();
         }
-
         if (bluetoothAdapter.isEnabled()) {
             showFrameControls();
             switchEnableBt.setChecked(true);
             setListAdapter(BT_BOUNDED);
         }
+        //кінец ініціалізаціїї
 
+        //слухач кнопки яка відправляє дані з текстового поля на ESP блютузом
         btn_send_message.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -170,20 +146,21 @@ public class MainActivity extends AppCompatActivity implements
                     Toast.makeText(MainActivity.this, R.string.succ_send, Toast.LENGTH_SHORT).show();
                     et_input_comand.setText("");
                     etConsole.setText("");
-                    if (isTest) {
-                        etConsole.setText(readStringFromTestLog());
-                        sbgolbal=new StringBuffer(readStringFromTestLog());
+                    if (isTest) {//під час тесту перезапише головну зміну тримання даних
+                        sbgolbal = new StringBuffer(readStringFromTestLog());
                     }
                 }
             }
         });
-
+        //слухач кнопки draw graph
         btn_create_graph.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-//                String dataFromBl = etConsole.getText().toString();
-                String dataFromBl=sbgolbal.toString();
+                //читання зміної що містить дані з блютузу
+                String dataFromBl = sbgolbal.toString();
+                //зберігання цих даних на смартфоні для подальшого аналізу
                 save(dataFromBl);
+                //малювання графу
                 graph.setVisibility(View.VISIBLE);
                 drawGraph();
 
@@ -191,43 +168,7 @@ public class MainActivity extends AppCompatActivity implements
         });
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(receiver);
-        if (connectThread != null) {
-            connectThread.cancel();
-        }
-        if (connectedThread != null) {
-            connectedThread.cancel();
-        }
-    }
-
-    public String readStringFromTestLog() {
-        FileInputStream fis = null;
-        BufferedReader br = null;
-        String data = "";
-        StringBuilder sb = new StringBuilder();
-        try {
-            InputStream isr = this.getResources().openRawResource(R.raw.log);
-            br = new BufferedReader(new InputStreamReader(isr));
-            while ((data = br.readLine()) != null) {
-                sb.append(data).append("\n");
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (fis != null) {
-                try {
-                    fis.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return sb.toString();
-    }
-
+    //Зберігання даних на смартфон
     public void save(String text) {
         FileOutputStream fos = null;
         try {
@@ -250,31 +191,34 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-
+    //читання лог файлу з телефону
     int[][] readFile() {
         int[][] intsAll = null;
-        int i = 0;
+        int sizeOfList = 0;
         String[] dataAr = new String[2];
         FileInputStream fis = null;
         BufferedReader br = null;
         List<String> list = new ArrayList();
         InputStreamReader isr = null;
         String data = "";
-        StringBuilder sb = new StringBuilder();
         try {
             fis = openFileInput(FILE_NAME);
             isr = new InputStreamReader(fis);
             br = new BufferedReader(isr);
             while ((data = br.readLine()) != null) {
-                i++;
+                //запис кожної строки в колекцію листа
                 list.add(data);
             }
-            intsAll = new int[i + 1][2];
+            //зміна яка зберігає кількість строк
+            sizeOfList=list.size();
+            intsAll = new int[sizeOfList + 1][2];
             int j = 0;
-            while (j < i - 1) {
+            while (j < sizeOfList - 1) {
+                //Отримання кожної строки з колекції
                 data = list.get(j);
-                sb.append(data).append("\n");
+                //розбиття строки на масив з двух значень які були розділені пробілом
                 dataAr = data.split(" ");
+                //парсинг кожного числа в твою комірку дво вимірного масиву
                 intsAll[j][0] = Integer.parseInt(dataAr[0]);
                 intsAll[j][1] = Integer.parseInt(dataAr[1]);
                 j++;
@@ -293,10 +237,321 @@ public class MainActivity extends AppCompatActivity implements
                 }
             }
         }
-        numberOfElements = i;
+        numberOfElements = sizeOfList;
         return intsAll;
     }
 
+    //знаходження значення сатурації послідовним викликом всіх методів
+    public double DiscoverSaO2(int[][] ints) {
+        double[][] XiAndYiDoubles = XiAndYi(ints);
+        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
+        double sumX = sumX(XiAndYiDoubles);
+        double sumY = sumY(XiAndYiDoubles);
+        double sumXX = sumXX(XXandXYandYYDoubles);
+        double sumXY = sumXY(XXandXYandYYDoubles);
+        double sumYY = sumYY(XXandXYandYYDoubles);
+        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
+        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+        Log.i("rd1", r1 + "");
+        if (r1 >= .99) {
+            //перевірка на кореляцію
+            return SaO2(a);
+        } else
+            return 0;
+    }
+
+    public void drawGraph() {
+        int[][] intsAll = readFile();
+        int i = numberOfElements;
+        double[] doublesSo2 = new double[i / 200];
+        int[][] ints = new int[200][2];
+        List<Double> listSo2 = new ArrayList();
+        for (int j = 0; j < i / 200; j++) {
+            for (int k = 0; k < 200; k++) {
+                //використання методу вікна в 200 знаачень
+                ints[k][0] = intsAll[k + j * 200][0];
+                ints[k][1] = intsAll[k + j * 200][1];
+            }
+            doublesSo2[j] = (DiscoverSaO2(ints));
+            if (doublesSo2[j] != 0) {
+                //якщо значення не дорівню нулю тобто коефіціент парнох кореляції нормальний то тільки тоді додається значеня
+                listSo2.add(doublesSo2[j]);
+            }
+        }
+        graph.setVisibility(View.VISIBLE);
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
+        int size = listSo2.size();
+        for (int i2 = 0; i2 < size; i2++) {
+            //Додавання всіх значень на графік
+            DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
+            series.appendData(point, true, size);
+        }
+        //заданя межі графіку
+        graph.getViewport().setMinX(0);
+        graph.getViewport().setMaxX(size);
+        graph.getViewport().setMinY(-10);
+        graph.getViewport().setMaxY(110);
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setXAxisBoundsManual(true);
+        series.setColor(Color.RED);
+        graph.addSeries(series);
+        double sred = 0;
+        //визначення середньго начення сатурації
+        for (int l = 0; l < size; l++) {
+            sred += listSo2.get(l);
+        }
+        sred = sred / size;
+        StringBuffer stringBuffer = new StringBuffer();
+        for (int i2 = 0; i2 < size; i2++) {
+            //Запис всіх значень у верхне поле разом з результатом
+            stringBuffer.append(listSo2.get(i2)).append("\n");
+        }
+        stringBuffer.append("So2 mid= " + sred);
+        etConsole.setText(stringBuffer.toString());
+        Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
+    }
+
+    //читаня лог файлу аналогічна звичайному читаню
+    public String readStringFromTestLog() {
+        FileInputStream fis = null;
+        BufferedReader br = null;
+        String data = "";
+        StringBuilder sb = new StringBuilder();
+        try {
+            //читаня  тестогового лог файлу з телефону
+            InputStream isr = this.getResources().openRawResource(R.raw.log);
+            br = new BufferedReader(new InputStreamReader(isr));
+            while ((data = br.readLine()) != null) {
+                //запис кожної строки в один текст
+                sb.append(data).append("\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private class ConnectedThread extends Thread {
+        private final InputStream inputStream;
+        private final OutputStream outputStream;
+        private boolean isConnected = false;
+        public ConnectedThread(BluetoothSocket bluetoothSocket) {
+            InputStream inputStream = null;
+            OutputStream outputStream = null;
+            try {
+                inputStream = bluetoothSocket.getInputStream();
+                outputStream = bluetoothSocket.getOutputStream();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            this.inputStream = inputStream;
+            this.outputStream = outputStream;
+            isConnected = true;
+        }
+
+        @Override
+        public void run() {
+            BufferedInputStream bis = new BufferedInputStream(inputStream);
+            StringBuffer buffer = new StringBuffer();
+            final StringBuffer sbConsole = new StringBuffer();
+            final ScrollingMovementMethod movementMethod = new ScrollingMovementMethod();
+            while (isConnected) {
+                try {
+                    int bytes = bis.read();
+                    buffer.append((char) bytes);
+                    int eof = buffer.indexOf("\r\n");
+                    if (eof > 0) {
+                        sbConsole.append(buffer.toString());
+                        buffer.delete(0, buffer.length());
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                //запис вхідних даних до глобальнох зміни що зберігає дані з блютузу
+                                sbgolbal = sbConsole;
+                                etConsole.setMovementMethod(movementMethod);
+                            }
+                        });
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            try {
+                bis.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void writeMesToBlu(String command) {
+            byte[] bytes = command.getBytes();
+            if (outputStream != null) {
+                try {
+                    // передача даних в нижнього поля по блютузу ESP
+                    outputStream.write(bytes);
+                    outputStream.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        public void cancel() {
+            try {
+                isConnected = false;
+                inputStream.close();
+                outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public double SaO2(double a) {
+        Log.i("saO2A", a + "");
+        double rez = (1.13 - (a / 3));
+        Log.i("saO2rez", rez + "");
+        return rez;
+    }
+
+    private double SaCO(double a) {
+        Log.i("saOA", a + "");
+        double rez = ((0.86 * a) - 0.72) * 0.1;
+        Log.i("saOrez", rez + "");
+        return rez;
+    }
+
+    public double aVidnosh(double sumX, double sumY, double sumXX, double sumXY) {
+        double rez = ((((sumX * sumY) - (200 * sumXY))) / ((sumX * sumX) - (200 * sumXX)));
+        Log.i("aVidnosh", rez + "");
+        return rez;
+    }
+
+    private double rOne(double sumX, double sumY, double sumXX, double sumXY, double sumYY) {
+        double rez = ((sumXY - ((sumX * sumY) / 200))) / ((Math.sqrt(sumXX - ((sumX * sumX) / 200))) * (Math.sqrt(sumYY - ((sumY * sumY) / 200))));
+        return rez + 1;
+    }
+
+    public int Xmax(int[][] ints) {
+        int XmaxInt = 0;
+        for (int i = 0; i < 200; i++) {
+            if (ints[i][0] > XmaxInt) {
+                XmaxInt = ints[i][0];
+            }
+        }
+        return XmaxInt;
+    }
+
+    public int Ymax(int[][] ints) {
+        int YmaxInt = 0;
+        for (int i = 0; i < 200; i++) {
+            if (ints[i][1] > YmaxInt) {
+                YmaxInt = ints[i][1];
+            }
+        }
+        return YmaxInt;
+    }
+
+    public double[][] XiAndYi(int[][] ints) {
+        double[][] XiAndYiDoubles = new double[200][2];
+        double Xmax = Xmax(ints);
+        double Ymax = Ymax(ints);
+        for (int i = 0; i < 200; i++) {
+            XiAndYiDoubles[i][0] = (double) ints[i][0] / Xmax;
+            XiAndYiDoubles[i][1] = (double) ints[i][1] / Ymax;
+        }
+        return XiAndYiDoubles;
+    }
+
+    public double[][] XXandXYandYY(double[][] doubles) {
+        double[][] XXandXYandYYDoubles = new double[200][3];
+        for (int i = 0; i < 200; i++) {
+            XXandXYandYYDoubles[i][0] = doubles[i][0] * doubles[i][0];
+            XXandXYandYYDoubles[i][1] = doubles[i][0] * doubles[i][1];
+            XXandXYandYYDoubles[i][2] = doubles[i][1] * doubles[i][1];
+        }
+        return XXandXYandYYDoubles;
+    }
+
+    public double sumX(double[][] XiAndYiDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XiAndYiDoubles[i][0];
+        }
+        return rez;
+    }
+
+    public double sumY(double[][] XiAndYiDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XiAndYiDoubles[i][1];
+        }
+        return rez;
+    }
+
+    public double sumXX(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][0];
+        }
+        return rez;
+    }
+
+    public double sumXY(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][1];
+        }
+        return rez;
+    }
+
+    public double sumYY(double[][] XXandXYandYYDoubles) {
+        double rez = 0;
+        for (int i = 0; i < 200; i++) {
+            rez += XXandXYandYYDoubles[i][2];
+        }
+        return rez;
+    }
+    public double DiscoverSaCo(int[][] ints) {
+        double[][] XiAndYiDoubles = XiAndYi(ints);
+        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
+        double sumX = sumX(XiAndYiDoubles);
+        double sumY = sumY(XiAndYiDoubles);
+        double sumXX = sumXX(XXandXYandYYDoubles);
+        double sumXY = sumXY(XXandXYandYYDoubles);
+        double sumYY = sumYY(XXandXYandYYDoubles);
+        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
+        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+        Log.i("r1_Saco", r1 + "");
+        Log.i("a1_Saco", a + "");
+        Log.i("sumX1_Saco", sumX + "");
+        if (r1 >= .98) {
+            Log.i("saCo", SaCO(a) + "");
+            return SaCO(a);
+        } else return 0;
+    }
+
+    //Далі ідуть системні обовязкові для перевизначення методи
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(receiver);
+        if (connectThread != null) {
+            connectThread.cancel();
+        }
+        if (connectedThread != null) {
+            connectedThread.cancel();
+        }
+    }
 
     @Override
     public void onClick(View v) {
@@ -328,7 +583,6 @@ public class MainActivity extends AppCompatActivity implements
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
         if (buttonView.equals(switchEnableBt)) {
             enableBt(isChecked);
-
             if (!isChecked) {
                 showFrameMessage();
             }
@@ -522,281 +776,6 @@ public class MainActivity extends AppCompatActivity implements
                 e.printStackTrace();
             }
         }
-    }
-
-    private class ConnectedThread extends Thread {
-
-        private final InputStream inputStream;
-        private final OutputStream outputStream;
-        private boolean isConnected = false;
-
-        public ConnectedThread(BluetoothSocket bluetoothSocket) {
-            InputStream inputStream = null;
-            OutputStream outputStream = null;
-
-            try {
-                inputStream = bluetoothSocket.getInputStream();
-                outputStream = bluetoothSocket.getOutputStream();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            this.inputStream = inputStream;
-            this.outputStream = outputStream;
-            isConnected = true;
-        }
-
-        @Override
-        public void run() {
-            BufferedInputStream bis = new BufferedInputStream(inputStream);
-            StringBuffer buffer = new StringBuffer();
-            final StringBuffer sbConsole = new StringBuffer();
-            final ScrollingMovementMethod movementMethod = new ScrollingMovementMethod();
-            while (isConnected) {
-                try {
-                    int bytes = bis.read();
-                    buffer.append((char) bytes);
-                    int eof = buffer.indexOf("\r\n");
-                    if (eof > 0) {
-                        sbConsole.append(buffer.toString());
-                        buffer.delete(0, buffer.length());
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                 sbgolbal = sbConsole;
-//                                etConsole.setText(sbConsole.toString());
-                                etConsole.setMovementMethod(movementMethod);
-                            }
-                        });
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            try {
-                bis.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        public void writeMesToBlu(String command) {
-            byte[] bytes = command.getBytes();
-            if (outputStream != null) {
-                try {
-                    outputStream.write(bytes);
-                    outputStream.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        public void cancel() {
-            try {
-                isConnected = false;
-                inputStream.close();
-                outputStream.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public double SaO2(double a) {
-        Log.i("saO2A", a + "");
-        double rez = (1.13 - (a / 3));
-        Log.i("saO2rez", rez + "");
-        return rez;
-    }
-
-    private double SaCO(double a) {
-        Log.i("saOA", a + "");
-        double rez = ((0.86 * a) - 0.72) * 0.1;
-        Log.i("saOrez", rez + "");
-        return rez;
-    }
-
-    public double aVidnosh(double sumX, double sumY, double sumXX, double sumXY) {
-        double rez = ((((sumX * sumY) - (200 * sumXY))) / ((sumX * sumX) - (200 * sumXX)));
-        Log.i("aVidnosh", rez + "");
-        return rez;
-    }
-
-    private double rOne(double sumX, double sumY, double sumXX, double sumXY, double sumYY) {
-        double rez = ((sumXY - ((sumX * sumY) / 200))) / ((Math.sqrt(sumXX - ((sumX * sumX) / 200))) * (Math.sqrt(sumYY - ((sumY * sumY) / 200))));
-        return rez + 1;
-    }
-
-    public int Xmax(int[][] ints) {
-        int XmaxInt = 0;
-        for (int i = 0; i < 200; i++) {
-            if (ints[i][0] > XmaxInt) {
-                XmaxInt = ints[i][0];
-            }
-        }
-        return XmaxInt;
-    }
-
-    public int Ymax(int[][] ints) {
-        int YmaxInt = 0;
-        for (int i = 0; i < 200; i++) {
-            if (ints[i][1] > YmaxInt) {
-                YmaxInt = ints[i][1];
-            }
-        }
-        return YmaxInt;
-    }
-
-    public double[][] XiAndYi(int[][] ints) {
-        double[][] XiAndYiDoubles = new double[200][2];
-        double Xmax = Xmax(ints);
-        double Ymax = Ymax(ints);
-        for (int i = 0; i < 200; i++) {
-            XiAndYiDoubles[i][0] = (double) ints[i][0] / Xmax;
-            XiAndYiDoubles[i][1] = (double) ints[i][1] / Ymax;
-        }
-        return XiAndYiDoubles;
-    }
-
-    public double[][] XXandXYandYY(double[][] doubles) {
-        double[][] XXandXYandYYDoubles = new double[200][3];
-        for (int i = 0; i < 200; i++) {
-            XXandXYandYYDoubles[i][0] = doubles[i][0] * doubles[i][0];
-            XXandXYandYYDoubles[i][1] = doubles[i][0] * doubles[i][1];
-            XXandXYandYYDoubles[i][2] = doubles[i][1] * doubles[i][1];
-        }
-        return XXandXYandYYDoubles;
-    }
-
-    public double sumX(double[][] XiAndYiDoubles) {
-        double rez = 0;
-        for (int i = 0; i < 200; i++) {
-            rez += XiAndYiDoubles[i][0];
-        }
-        return rez;
-    }
-
-    public double sumY(double[][] XiAndYiDoubles) {
-        double rez = 0;
-        for (int i = 0; i < 200; i++) {
-            rez += XiAndYiDoubles[i][1];
-        }
-        return rez;
-    }
-
-    public double sumXX(double[][] XXandXYandYYDoubles) {
-        double rez = 0;
-        for (int i = 0; i < 200; i++) {
-            rez += XXandXYandYYDoubles[i][0];
-        }
-        return rez;
-    }
-
-    public double sumXY(double[][] XXandXYandYYDoubles) {
-        double rez = 0;
-        for (int i = 0; i < 200; i++) {
-            rez += XXandXYandYYDoubles[i][1];
-        }
-        return rez;
-    }
-
-    public double sumYY(double[][] XXandXYandYYDoubles) {
-        double rez = 0;
-        for (int i = 0; i < 200; i++) {
-            rez += XXandXYandYYDoubles[i][2];
-        }
-        return rez;
-    }
-
-    public double DiscoverSaO2(int[][] ints) {
-        double[][] XiAndYiDoubles = XiAndYi(ints);
-        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
-        double sumX = sumX(XiAndYiDoubles);
-        double sumY = sumY(XiAndYiDoubles);
-        double sumXX = sumXX(XXandXYandYYDoubles);
-        double sumXY = sumXY(XXandXYandYYDoubles);
-        double sumYY = sumYY(XXandXYandYYDoubles);
-        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
-        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
-
-        Log.i("rd1", r1+ "");
-        if (r1 >= .99) {
-            return SaO2(a);
-        } else
-            return 0;
-    }
-
-    public double DiscoverSaCo(int[][] ints) {
-        double[][] XiAndYiDoubles = XiAndYi(ints);
-        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
-        double sumX = sumX(XiAndYiDoubles);
-        double sumY = sumY(XiAndYiDoubles);
-        double sumXX = sumXX(XXandXYandYYDoubles);
-        double sumXY = sumXY(XXandXYandYYDoubles);
-        double sumYY = sumYY(XXandXYandYYDoubles);
-        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
-        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
-        Log.i("r1_Saco", r1 + "");
-        Log.i("a1_Saco", a + "");
-        Log.i("sumX1_Saco", sumX + "");
-        if (r1 >= .98) {
-            Log.i("saCo", SaCO(a) + "");
-            return SaCO(a);
-        } else return 0;
-    }
-
-
-    public void drawGraph() {
-        int[][] intsAll = readFile();
-        int i = numberOfElements;
-
-        double[] doublesSo2 = new double[i / 200];
-        int[][] ints = new int[200][2];
-        List<Double> listSo2 = new ArrayList();
-        for (int j = 0; j < i / 200; j++) {
-            for (int k = 0; k < 200; k++) {
-                ints[k][0] = intsAll[k + j * 200][0];
-                ints[k][1] = intsAll[k + j * 200][1];
-            }
-            doublesSo2[j] = (DiscoverSaO2(ints));
-            Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
-            if (doublesSo2[j] != 0) {
-                if (j > 1) {
-                    listSo2.add(doublesSo2[j]);
-                    Log.i("listSo2addl", doublesSo2[j] + "");
-                }
-            }
-        }
-        graph.setVisibility(View.VISIBLE);
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
-        int size = listSo2.size();
-        for (int i2 = 0; i2 < size; i2++) {
-            DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
-            series.appendData(point, true, size);
-        }
-        graph.getViewport().setMinX(0);
-        graph.getViewport().setMaxX(size);
-        graph.getViewport().setMinY(-10);
-        graph.getViewport().setMaxY(110);
-        graph.getViewport().setYAxisBoundsManual(true);
-        graph.getViewport().setXAxisBoundsManual(true);
-        series.setColor(Color.RED);
-        graph.addSeries(series);
-        double sred = 0;
-        for (int l = 0; l < size; l++) {
-            sred += listSo2.get(l);
-        }
-        sred = sred / size;
-        Log.i("sredCheck", sred + "");
-        StringBuffer stringBuffer=new StringBuffer();
-        for (int i2 = 0; i2 < size; i2++) {
-           stringBuffer.append(listSo2.get(i2)).append("\n");
-        }
-        stringBuffer.append("So2 mid= "+sred);
-        etConsole.setText(stringBuffer.toString());
-        Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
     }
 }
 

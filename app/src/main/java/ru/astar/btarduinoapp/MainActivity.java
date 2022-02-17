@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity implements
     int numberOfElements;
     private static final String TAG = MainActivity.class.getSimpleName();
     //перемикач для читання тестового лог файлу
-    public static boolean isTest = true;
+    public static boolean isTest = false;
     //назва файлу який свториться після отримання даних по блютуз каналу
     private static final String FILE_NAME = "logFileFromBlueTooth";
 

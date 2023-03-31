@@ -152,7 +152,7 @@
             android:gravity="bottom"
             android:lines="4"
             android:scrollbars="vertical"
-            android:text="start" />
+            android:text="0" />
 
         <Button
             android:id="@+id/btn_send_message"

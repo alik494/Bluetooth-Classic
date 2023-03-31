@@ -1,5 +1,6 @@
 package ru.astar.btarduinoapp;
 
+import android.Manifest;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -8,11 +9,13 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Build;
+import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
@@ -51,68 +54,54 @@ public class MainActivity extends AppCompatActivity implements
         CompoundButton.OnCheckedChangeListener,
         AdapterView.OnItemClickListener,
         View.OnClickListener {
-    private static final long START_TIME_IN_MILLIS = 5000;
-    private long mTimeLeftInMillis = START_TIME_IN_MILLIS;
-    private TextView mTextViewCountDown;
-    private boolean mTimerRunning;
-    GraphView graph;
-
-    private static final String FILE_NAME = "testData";
-    int numberOfElements;
-
-
-    private static final String TAG = MainActivity.class.getSimpleName();
     public static final int REQUEST_CODE_LOC = 1;
+    private static final long START_TIME_IN_MILLIS = 5000;
+    private GraphView graph;
+    int numberOfElements;
+    private static final String TAG = MainActivity.class.getSimpleName();
+    //перемикач для читання тестового лог файлу
+    public static boolean isTest = false;
+    //назва файлу який свториться після отримання даних по блютуз каналу
+    private static final String FILE_NAME = "logFileFromBlueTooth";
 
+    //початок інінціалізаціїї
     private static final int REQ_ENABLE_BT = 10;
     public static final int BT_BOUNDED = 21;
     public static final int BT_SEARCH = 22;
-
-    public static final int LED_RED = 30;
-    public static final int LED_GREEN = 31;
-
     private FrameLayout frameMessage;
     private LinearLayout frameControls;
-
     private RelativeLayout frameLedControls;
     private Button btnDisconnect;
     private Button btn_send_message;
     private Button btn_create_graph;
     private EditText et_input_comand;
-    private boolean record;
-    private MainActivity mCountDownTimer;
-
     private Switch switchRedLed;
     private Switch switchGreenLed;
     private EditText etConsole;
-
+    private StringBuffer sbgolbal = new StringBuffer();
+    private int counter =0;
     private Switch switchEnableBt;
     private Button btnEnableSearch;
     private ProgressBar pbProgress;
     private ListView listBtDevices;
-
     private BluetoothAdapter bluetoothAdapter;
     private BtListAdapter listAdapter;
     private ArrayList<BluetoothDevice> bluetoothDevices;
-
     private ConnectThread connectThread;
     private ConnectedThread connectedThread;
-
     private ProgressDialog progressDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         frameMessage = findViewById(R.id.frame_message);
         frameControls = findViewById(R.id.frame_control);
-
         switchEnableBt = findViewById(R.id.switch_enable_bt);
         btnEnableSearch = findViewById(R.id.btn_enable_search);
         pbProgress = findViewById(R.id.pb_progress);
         listBtDevices = findViewById(R.id.lv_bt_device);
-
         frameLedControls = findViewById(R.id.frameLedControls);
         btnDisconnect = findViewById(R.id.btn_disconnect);
         switchGreenLed = findViewById(R.id.switch_led_green);
@@ -121,66 +110,73 @@ public class MainActivity extends AppCompatActivity implements
         btn_send_message = findViewById(R.id.btn_send_message);
         btn_create_graph = findViewById(R.id.btn_create_graph);
         et_input_comand = findViewById(R.id.et_input_comand);
-        mTextViewCountDown = findViewById(R.id.text_view_countdown);
         graph = (GraphView) findViewById(R.id.graphView);
-
-
-
         switchEnableBt.setOnCheckedChangeListener(this);
         btnEnableSearch.setOnClickListener(this);
         listBtDevices.setOnItemClickListener(this);
-
         btnDisconnect.setOnClickListener(this);
         switchGreenLed.setOnCheckedChangeListener(this);
         switchRedLed.setOnCheckedChangeListener(this);
-
         bluetoothDevices = new ArrayList<>();
-
         progressDialog = new ProgressDialog(this);
         progressDialog.setCancelable(false);
         progressDialog.setTitle(getString(R.string.connecting));
         progressDialog.setMessage(getString(R.string.please_wait));
-
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         registerReceiver(receiver, filter);
-
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
         if (bluetoothAdapter == null) {
             Toast.makeText(this, R.string.bluetooth_not_supported, Toast.LENGTH_SHORT).show();
             Log.d(TAG, "onCreate: " + getString(R.string.bluetooth_not_supported));
             finish();
         }
-
         if (bluetoothAdapter.isEnabled()) {
             showFrameControls();
             switchEnableBt.setChecked(true);
             setListAdapter(BT_BOUNDED);
         }
+        //кінец ініціалізаціїї
+
+        //слухач кнопки яка відправляє дані з текстового поля на ESP блютузом
+        btn_send_message.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (et_input_comand.getText().toString().length() > 0) {
+                    connectedThread.writeMesToBlu(et_input_comand.getText().toString());
+//                    Toast.makeText(MainActivity.this, R.string.succ_send, Toast.LENGTH_SHORT).show();
+                    et_input_comand.setText("");
+                    etConsole.setText("");
+                    sbgolbal = new StringBuffer();
+                    if (isTest) {//під час тесту перезапише головну зміну тримання даних
+                        sbgolbal = new StringBuffer(readStringFromTestLog());
+                    }
+                }
+            }
+        });
+        //слухач кнопки draw graph
+        btn_create_graph.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //читання зміної що містить дані з блютузу
+                String dataFromBl = sbgolbal.toString();
+                //зберігання цих даних на смартфоні для подальшого аналізу
+                save(dataFromBl);
+                //малювання графу
+                graph.setVisibility(View.VISIBLE);
+//                drawGraph();
+
+            }
+        });
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-
-        unregisterReceiver(receiver);
-
-        if (connectThread != null) {
-            connectThread.cancel();
-        }
-
-        if (connectedThread != null) {
-            connectedThread.cancel();
-        }
-    }
-
+    //Зберігання даних на смартфон
     public void save(String text) {
         FileOutputStream fos = null;
         try {
-            fos = openFileOutput(FILE_NAME , MODE_PRIVATE);
+            fos = openFileOutput(FILE_NAME, MODE_PRIVATE);
             fos.write(text.getBytes());
             Toast.makeText(this, "Saved to " + getFilesDir() + "/" + FILE_NAME,
                     Toast.LENGTH_LONG).show();
@@ -199,25 +195,142 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-
-    int[][] readFile(){
-        int[][] intsAll = new int[30000][3];
-        int i =0;
+    //читання лог файлу з телефону
+    int[][] readFile() {
+        int[][] intsAll = null;
+        int sizeOfList = 0;
+        String[] dataAr = new String[2];
         FileInputStream fis = null;
         BufferedReader br = null;
-        String data="";
-        StringBuilder sb=new StringBuilder();
+        List<String> list = new ArrayList();
+        InputStreamReader isr = null;
+        String data = "";
         try {
             fis = openFileInput(FILE_NAME);
-            InputStreamReader isr = new InputStreamReader(fis);
+            isr = new InputStreamReader(fis);
             br = new BufferedReader(isr);
+
             while ((data = br.readLine()) != null) {
-//                sb.append(data).append("\n");
-                intsAll[i][0] = Integer.parseInt(data.split(" ")[0]);
-                intsAll[i][2] = Integer.parseInt(data.split(" ")[1]);
-//                intsAll[i][1] = Integer.parseInt(data.substring(6, 11));
-//                intsAll[i][2] = Integer.parseInt(data.substring(12, 17));
-                i++;
+                //запис кожної строки в колекцію листа
+                if (data.length() < 20) {
+                    list.add(data);
+                }
+            }
+            //зміна яка зберігає кількість строк
+            sizeOfList = list.size();
+            intsAll = new int[sizeOfList + 1][2];
+            int j = 0;
+            while (j < sizeOfList - 1) {
+                //Отримання кожної строки з колекції
+                data = list.get(j);
+                //розбиття строки на масив з двух значень які були розділені пробілом
+                dataAr = data.split(" ");
+                //парсинг кожного числа в твою комірку дво вимірного масиву
+                intsAll[j][0] = Integer.parseInt(dataAr[0]);
+                intsAll[j][1] = Integer.parseInt(dataAr[1]);
+                j++;
+            }
+            Toast.makeText(this, "Readed lines " + j + getFilesDir() + "/" + FILE_NAME,
+                    Toast.LENGTH_LONG).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "e" + e, Toast.LENGTH_LONG);
+            e.printStackTrace();
+        } finally {
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        numberOfElements = sizeOfList;
+        return intsAll;
+    }
+
+    //знаходження значення сатурації послідовним викликом всіх методів
+    public double DiscoverSaO2(int[][] ints) {
+        double[][] XiAndYiDoubles = XiAndYi(ints);
+        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
+        double sumX = sumX(XiAndYiDoubles);
+        double sumY = sumY(XiAndYiDoubles);
+        double sumXX = sumXX(XXandXYandYYDoubles);
+        double sumXY = sumXY(XXandXYandYYDoubles);
+        double sumYY = sumYY(XXandXYandYYDoubles);
+        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
+        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
+        Log.i("rd1", r1 + "");
+        if (r1 >= .99) {
+            //перевірка на кореляцію
+            return SaO2(a);
+        } else
+            return 0;
+    }
+
+    public void drawGraph() {
+        int[][] intsAll = readFile();
+        int i = numberOfElements;
+        double[] doublesSo2 = new double[i / 200];
+        int[][] ints = new int[200][2];
+        List<Double> listSo2 = new ArrayList();
+        for (int j = 0; j < i / 200; j++) {
+            for (int k = 0; k < 200; k++) {
+                //використання методу вікна в 200 знаачень
+                ints[k][0] = intsAll[k + j * 200][0];
+                ints[k][1] = intsAll[k + j * 200][1];
+            }
+            doublesSo2[j] = (DiscoverSaO2(ints));
+            if (doublesSo2[j] != 0) {
+                //якщо значення не дорівню нулю тобто коефіціент парнох кореляції нормальний то тільки тоді додається значеня
+                listSo2.add(doublesSo2[j]);
+            }
+        }
+        graph.setVisibility(View.VISIBLE);
+        LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
+        int size = listSo2.size();
+        for (int i2 = 0; i2 < size; i2++) {
+            //Додавання всіх значень на графік
+            DataPoint point = new DataPoint(i2, listSo2.get(i2) * 100);
+            series.appendData(point, true, size);
+        }
+        //заданя межі графіку
+        graph.getViewport().setMinX(0);
+        graph.getViewport().setMaxX(size);
+        graph.getViewport().setMinY(-10);
+        graph.getViewport().setMaxY(110);
+        graph.getViewport().setYAxisBoundsManual(true);
+        graph.getViewport().setXAxisBoundsManual(true);
+        series.setColor(Color.RED);
+        graph.addSeries(series);
+        double sred = 0;
+        //визначення середньго начення сатурації
+        for (int l = 0; l < size; l++) {
+            sred += listSo2.get(l);
+        }
+        sred = sred / size;
+        StringBuffer stringBuffer = new StringBuffer();
+        for (int i2 = 0; i2 < size; i2++) {
+            //Запис всіх значень у верхне поле разом з результатом
+            stringBuffer.append(listSo2.get(i2)).append("\n");
+        }
+        stringBuffer.append("So2 mid= " + sred);
+        etConsole.setText(stringBuffer.toString());
+        Toast.makeText(this, "среднее " + sred, Toast.LENGTH_LONG).show();
+    }
+
+    //читаня лог файлу аналогічна звичайному читаню
+    public String readStringFromTestLog() {
+        FileInputStream fis = null;
+        BufferedReader br = null;
+        String data = "";
+        StringBuilder sb = new StringBuilder();
+        try {
+            //читаня  тестогового лог файлу з телефону
+            InputStream isr = this.getResources().openRawResource(R.raw.log);
+            br = new BufferedReader(new InputStreamReader(isr));
+            while ((data = br.readLine()) != null) {
+                //запис кожної строки в один текст
+                sb.append(data).append("\n");
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -230,281 +343,10 @@ public class MainActivity extends AppCompatActivity implements
                 }
             }
         }
-        numberOfElements=i;
-        return   intsAll;
-    }
-
-
-    @Override
-    public void onClick(View v) {
-        if (v.equals(btnEnableSearch)) {
-            enableSearch();
-        } else if (v.equals(btnDisconnect)) {
-            // TODO отключение от устройства
-            if (connectedThread != null) {
-                connectedThread.cancel();
-            }
-            if (connectThread != null) {
-                connectThread.cancel();
-            }
-
-            showFrameControls();
-        } else if (v.equals(btn_send_message)) {
-            connectedThread.writeMesToBlu(et_input_comand.getText().toString());
-            et_input_comand.setText("");
-            etConsole.setText("");
-
-        } else if (v.equals(btn_create_graph)) {
-            String dataFromBl=etConsole.getText().toString();
-            save(dataFromBl);
-            graph.setVisibility(View.VISIBLE);
-            drawGraph();
-        }
-    }
-
-
-    @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        if (parent.equals(listBtDevices)) {
-            BluetoothDevice device = bluetoothDevices.get(position);
-            if (device != null) {
-                connectThread = new ConnectThread(device);
-                connectThread.start();
-            }
-        }
-    }
-
-    @Override
-    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-        if (buttonView.equals(switchEnableBt)) {
-            enableBt(isChecked);
-
-            if (!isChecked) {
-                showFrameMessage();
-            }
-        } else if (buttonView.equals(switchRedLed)) {
-            // TODO включение или отключение красного светодиода
-            enableLed(LED_RED, isChecked);
-
-        } else if (buttonView.equals(switchGreenLed)) {
-            // TODO включение или отключение зеленого светодиода
-            enableLed(LED_GREEN, isChecked);
-
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if (requestCode == REQ_ENABLE_BT) {
-            if (resultCode == RESULT_OK && bluetoothAdapter.isEnabled()) {
-                showFrameControls();
-                setListAdapter(BT_BOUNDED);
-            } else if (resultCode == RESULT_CANCELED) {
-                enableBt(true);
-            }
-        }
-    }
-
-    private void showFrameMessage() {
-        frameMessage.setVisibility(View.VISIBLE);
-        frameLedControls.setVisibility(View.GONE);
-        frameControls.setVisibility(View.GONE);
-    }
-
-    private void showFrameControls() {
-        frameMessage.setVisibility(View.GONE);
-        frameLedControls.setVisibility(View.GONE);
-        frameControls.setVisibility(View.VISIBLE);
-    }
-
-    private void showFrameLedControls() {
-        frameLedControls.setVisibility(View.VISIBLE);
-        frameMessage.setVisibility(View.GONE);
-        frameControls.setVisibility(View.GONE);
-    }
-
-    private void enableBt(boolean flag) {
-        if (flag) {
-            Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(intent, REQ_ENABLE_BT);
-        } else {
-            bluetoothAdapter.disable();
-        }
-    }
-
-    private void setListAdapter(int type) {
-
-        bluetoothDevices.clear();
-        int iconType = R.drawable.ic_bluetooth_bounded_device;
-
-        switch (type) {
-            case BT_BOUNDED:
-                bluetoothDevices = getBoundedBtDevices();
-                iconType = R.drawable.ic_bluetooth_bounded_device;
-                break;
-            case BT_SEARCH:
-                iconType = R.drawable.ic_bluetooth_search_device;
-                break;
-        }
-        listAdapter = new BtListAdapter(this, bluetoothDevices, iconType);
-        listBtDevices.setAdapter(listAdapter);
-    }
-
-    private ArrayList<BluetoothDevice> getBoundedBtDevices() {
-        Set<BluetoothDevice> deviceSet = bluetoothAdapter.getBondedDevices();
-        ArrayList<BluetoothDevice> tmpArrayList = new ArrayList<>();
-        if (deviceSet.size() > 0) {
-            for (BluetoothDevice device : deviceSet) {
-                tmpArrayList.add(device);
-            }
-        }
-
-        return tmpArrayList;
-    }
-
-
-    private void enableSearch() {
-        if (bluetoothAdapter.isDiscovering()) {
-            bluetoothAdapter.cancelDiscovery();
-        } else {
-            accessLocationPermission();
-            bluetoothAdapter.startDiscovery();
-        }
-    }
-
-    private BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-
-            switch (action) {
-                case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
-                    btnEnableSearch.setText(R.string.stop_search);
-                    pbProgress.setVisibility(View.VISIBLE);
-                    setListAdapter(BT_SEARCH);
-                    break;
-                case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
-                    btnEnableSearch.setText(R.string.start_search);
-                    pbProgress.setVisibility(View.GONE);
-                    break;
-                case BluetoothDevice.ACTION_FOUND:
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (device != null) {
-                        bluetoothDevices.add(device);
-                        listAdapter.notifyDataSetChanged();
-                    }
-                    break;
-            }
-        }
-    };
-
-    /**
-     * Запрос на разрешение данных о местоположении (для Marshmallow 6.0)
-     */
-    private void accessLocationPermission() {
-        int accessCoarseLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION);
-        int accessFineLocation = this.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION);
-
-        List<String> listRequestPermission = new ArrayList<String>();
-
-        if (accessCoarseLocation != PackageManager.PERMISSION_GRANTED) {
-            listRequestPermission.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
-        }
-        if (accessFineLocation != PackageManager.PERMISSION_GRANTED) {
-            listRequestPermission.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
-        }
-
-        if (!listRequestPermission.isEmpty()) {
-            String[] strRequestPermission = listRequestPermission.toArray(new String[listRequestPermission.size()]);
-            this.requestPermissions(strRequestPermission, REQUEST_CODE_LOC);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case REQUEST_CODE_LOC:
-
-                if (grantResults.length > 0) {
-                    for (int gr : grantResults) {
-                        // Check if request is granted or not
-                        if (gr != PackageManager.PERMISSION_GRANTED) {
-                            return;
-                        }
-                    }
-                    //TODO - Add your code here to start Discovery
-                }
-                break;
-            default:
-                return;
-        }
-    }
-
-    private class ConnectThread extends Thread {
-
-        private BluetoothSocket bluetoothSocket = null;
-        private boolean success = false;
-
-        public ConnectThread(BluetoothDevice device) {
-            try {
-                Method method = device.getClass().getMethod("createRfcommSocket", new Class[]{int.class});
-                bluetoothSocket = (BluetoothSocket) method.invoke(device, 1);
-
-                progressDialog.show();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void run() {
-            try {
-                bluetoothSocket.connect();
-                success = true;
-
-                progressDialog.dismiss();
-            } catch (IOException e) {
-                e.printStackTrace();
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        progressDialog.dismiss();
-                        Toast.makeText(MainActivity.this, "Не могу соединиться!", Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-                cancel();
-            }
-
-            if (success) {
-                connectedThread = new ConnectedThread(bluetoothSocket);
-                connectedThread.start();
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        showFrameLedControls();
-                    }
-                });
-            }
-        }
-
-        public boolean isConnect() {
-            return bluetoothSocket.isConnected();
-        }
-
-        public void cancel() {
-            try {
-                bluetoothSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        return sb.toString();
     }
 
     private class ConnectedThread extends Thread {
-
         private final InputStream inputStream;
         private final OutputStream outputStream;
         private boolean isConnected = false;
@@ -512,14 +354,12 @@ public class MainActivity extends AppCompatActivity implements
         public ConnectedThread(BluetoothSocket bluetoothSocket) {
             InputStream inputStream = null;
             OutputStream outputStream = null;
-
             try {
                 inputStream = bluetoothSocket.getInputStream();
                 outputStream = bluetoothSocket.getOutputStream();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
             this.inputStream = inputStream;
             this.outputStream = outputStream;
             isConnected = true;
@@ -530,6 +370,7 @@ public class MainActivity extends AppCompatActivity implements
             BufferedInputStream bis = new BufferedInputStream(inputStream);
             StringBuffer buffer = new StringBuffer();
             final StringBuffer sbConsole = new StringBuffer();
+            String s1 = "";
             final ScrollingMovementMethod movementMethod = new ScrollingMovementMethod();
             while (isConnected) {
                 try {
@@ -537,13 +378,17 @@ public class MainActivity extends AppCompatActivity implements
                     buffer.append((char) bytes);
                     int eof = buffer.indexOf("\r\n");
                     if (eof > 0) {
-                        sbConsole.append(buffer.toString());
+                        final String finalS = buffer.toString();
                         buffer.delete(0, buffer.length());
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                etConsole.setText(sbConsole.toString());
-                                etConsole.setMovementMethod(movementMethod);
+                                //запис вхідних даних до глобальнох зміни що зберігає дані з блютузу
+//                                sbgolbal = sbConsole;
+                                sbgolbal.append(finalS);
+                                counter++;
+                                etConsole.setText(finalS);
+//                                etConsole.setMovementMethod(movementMethod);
                             }
                         });
                     }
@@ -563,6 +408,7 @@ public class MainActivity extends AppCompatActivity implements
             byte[] bytes = command.getBytes();
             if (outputStream != null) {
                 try {
+                    // передача даних в нижнього поля по блютузу ESP
                     outputStream.write(bytes);
                     outputStream.flush();
                 } catch (IOException e) {
@@ -582,24 +428,7 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private void enableLed(int led, boolean state) {
-        if (connectedThread != null && connectThread.isConnect()) {
-            String command = "";
 
-            switch (led) {
-                case LED_RED:
-                    etConsole.setText("");
-                    record = state;
-//                    command = (state) ? "red on#" : "red off#";
-                    break;
-                case LED_GREEN:
-                    command = (state) ? "green on#" : "green off#";
-                    break;
-            }
-
-//            connectedThread.write(command);
-        }
-    }
     public double SaO2(double a) {
         Log.i("saO2A", a + "");
         double rez = (1.13 - (a / 3));
@@ -706,27 +535,6 @@ public class MainActivity extends AppCompatActivity implements
         return rez;
     }
 
-    public double DiscoverSaO2(int[][] ints) {
-        double[][] XiAndYiDoubles = XiAndYi(ints);
-        double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
-        double sumX = sumX(XiAndYiDoubles);
-        double sumY = sumY(XiAndYiDoubles);
-        double sumXX = sumXX(XXandXYandYYDoubles);
-        double sumXY = sumXY(XXandXYandYYDoubles);
-        double sumYY = sumYY(XXandXYandYYDoubles);
-        double r1 = rOne(sumX, sumY, sumXX, sumXY, sumYY) - 1;
-        double a = aVidnosh(sumX, sumY, sumXX, sumXY);
-        Log.i("r1_test", r1 + "");
-        Log.i("saO2Discover", SaO2(a) + "");
-        Log.i("aSao2", a + " ");
-        Log.i("r1Sao2", r1 + " ");
-        Log.i("arLeSao2", XXandXYandYYDoubles.length + " ");
-        if (r1 >= .99) {
-            return SaO2(a);
-        } else
-            return 0;
-    }
-
     public double DiscoverSaCo(int[][] ints) {
         double[][] XiAndYiDoubles = XiAndYi(ints);
         double[][] XXandXYandYYDoubles = XXandXYandYY(XiAndYiDoubles);
@@ -746,89 +554,250 @@ public class MainActivity extends AppCompatActivity implements
         } else return 0;
     }
 
+    //Далі ідуть системні обовязкові для перевизначення методи
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(receiver);
+        if (connectThread != null) {
+            connectThread.cancel();
+        }
+        if (connectedThread != null) {
+            connectedThread.cancel();
+        }
+    }
 
-
-
-
-    public  void drawGraph() {
-//        String path =getFilesDir().toString();
-//        Log.d("Files", "Path: " + path);
-//        File directory = new File(path);
-//        File[] files = directory.listFiles();
-//        Log.d("Files", "Size: "+ files.length);
-//        for (int i = 0; i < files.length; i++)
-//        {
-//            Log.d("Files", "FileName:" + files[i].getName());
-//        }
-//
-        int [][] intsAll=readFile();
-        int i=numberOfElements;
-
-        double[] doublesSo2 = new double[i / 200];
-        int[][] ints = new int[200][2];
-        for (int j = 0; j < i / 200; j++) {
-            for (int k = 0; k < 200; k++) {
-                ints[k][0] = intsAll[k + j * 200][0];
-                ints[k][1] = intsAll[k + j * 200][2];
+    @Override
+    public void onClick(View v) {
+        if (v.equals(btnEnableSearch)) {
+            enableSearch();
+        } else if (v.equals(btnDisconnect)) {
+            if (connectedThread != null) {
+                connectedThread.cancel();
             }
-            doublesSo2[j] = (DiscoverSaO2(ints));
-            Log.i("doublesSo2DrawGraph", doublesSo2[j] + "");
-            if (doublesSo2[j] == 0) {
-                if (j > 1) {
-                    doublesSo2[j] = doublesSo2[j - 1];
+            if (connectThread != null) {
+                connectThread.cancel();
+            }
+            showFrameControls();
+        }
+    }
+
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        if (parent.equals(listBtDevices)) {
+            BluetoothDevice device = bluetoothDevices.get(position);
+            if (device != null) {
+                connectThread = new ConnectThread(device);
+                connectThread.start();
+            }
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        if (buttonView.equals(switchEnableBt)) {
+            enableBt(isChecked);
+            if (!isChecked) {
+                showFrameMessage();
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == REQ_ENABLE_BT) {
+            if (resultCode == RESULT_OK && bluetoothAdapter.isEnabled()) {
+                showFrameControls();
+                setListAdapter(BT_BOUNDED);
+            } else if (resultCode == RESULT_CANCELED) {
+                enableBt(true);
+            }
+        }
+    }
+
+    private void showFrameMessage() {
+        frameMessage.setVisibility(View.VISIBLE);
+        frameLedControls.setVisibility(View.GONE);
+        frameControls.setVisibility(View.GONE);
+    }
+
+    private void showFrameControls() {
+        frameMessage.setVisibility(View.GONE);
+        frameLedControls.setVisibility(View.GONE);
+        frameControls.setVisibility(View.VISIBLE);
+    }
+
+    private void showFrameLedControls() {
+        frameLedControls.setVisibility(View.VISIBLE);
+        frameMessage.setVisibility(View.GONE);
+        frameControls.setVisibility(View.GONE);
+    }
+
+    private void enableBt(boolean flag) {
+        if (flag) {
+            Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(intent, REQ_ENABLE_BT);
+        } else {
+            bluetoothAdapter.disable();
+        }
+    }
+
+    private void setListAdapter(int type) {
+
+        bluetoothDevices.clear();
+        int iconType = R.drawable.ic_bluetooth_bounded_device;
+        listAdapter = new BtListAdapter(this, bluetoothDevices, iconType);
+        listBtDevices.setAdapter(listAdapter);
+    }
+
+    private ArrayList<BluetoothDevice> getBoundedBtDevices() {
+        Set<BluetoothDevice> deviceSet = bluetoothAdapter.getBondedDevices();
+        ArrayList<BluetoothDevice> tmpArrayList = new ArrayList<>();
+        if (deviceSet.size() > 0) {
+            for (BluetoothDevice device : deviceSet) {
+                tmpArrayList.add(device);
+            }
+        }
+        return tmpArrayList;
+    }
+
+    private void enableSearch() {
+        if (bluetoothAdapter.isDiscovering()) {
+            bluetoothAdapter.cancelDiscovery();
+        } else {
+            accessLocationPermission();
+            bluetoothAdapter.startDiscovery();
+        }
+    }
+
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            switch (action) {
+                case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
+                    btnEnableSearch.setText(R.string.stop_search);
+                    pbProgress.setVisibility(View.VISIBLE);
+                    setListAdapter(BT_SEARCH);
+                    break;
+                case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
+                    btnEnableSearch.setText(R.string.start_search);
+                    pbProgress.setVisibility(View.GONE);
+                    break;
+                case BluetoothDevice.ACTION_FOUND:
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device != null) {
+                        bluetoothDevices.add(device);
+                        listAdapter.notifyDataSetChanged();
+                    }
+                    break;
+            }
+        }
+    };
+
+    private void accessLocationPermission() {
+        int accessCoarseLocation = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            accessCoarseLocation = this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+        int accessFineLocation = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            accessFineLocation = this.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+
+        List<String> listRequestPermission = new ArrayList<String>();
+
+        if (accessCoarseLocation != PackageManager.PERMISSION_GRANTED) {
+            listRequestPermission.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+        if (accessFineLocation != PackageManager.PERMISSION_GRANTED) {
+            listRequestPermission.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+
+        if (!listRequestPermission.isEmpty()) {
+            String[] strRequestPermission = listRequestPermission.toArray(new String[listRequestPermission.size()]);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                this.requestPermissions(strRequestPermission, REQUEST_CODE_LOC);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_CODE_LOC:
+                if (grantResults.length > 0) {
+                    for (int gr : grantResults) {
+                        // Check if request is granted or not
+                        if (gr != PackageManager.PERMISSION_GRANTED) {
+                            return;
+                        }
+                    }
                 }
+                break;
+            default:
+                return;
+        }
+    }
+
+    private class ConnectThread extends Thread {
+
+        private BluetoothSocket bluetoothSocket = null;
+        private boolean success = false;
+
+        public ConnectThread(BluetoothDevice device) {
+            try {
+                Method method = device.getClass().getMethod("createRfcommSocket", new Class[]{int.class});
+                bluetoothSocket = (BluetoothSocket) method.invoke(device, 1);
+
+                progressDialog.show();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-//            Log.i("doublesSo2DrawGraphAfter", doublesSo2[j] + "");
         }
 
-        double[] doublesSaCO = new double[i / 200];
-        int[][] ints2 = new int[200][2];
-        for (int j = 0; j < i / 200; j++) {
-            for (int k = 0; k < 200; k++) {
-                ints2[k][0] = intsAll[k + j * 200][1];
-                ints2[k][1] = intsAll[k + j * 200][2];
+        @Override
+        public void run() {
+            try {
+                bluetoothSocket.connect();
+                success = true;
+                progressDialog.dismiss();
+            } catch (IOException e) {
+                e.printStackTrace();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        progressDialog.dismiss();
+                        Toast.makeText(MainActivity.this, "Не могу соединиться!", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                cancel();
             }
-            doublesSaCO[j] = (DiscoverSaCo(ints2));
-            Log.i("doublesSaCODrawGraph", doublesSaCO[j] + "");
-            if (doublesSaCO[j] == 0) {
-                if (j > 1) {
-                    doublesSaCO[j] = doublesSaCO[j - 1];
-                }
-            }
-//            Log.i("doublesSaCODrawGraphAfter", doublesSaCO[j] + "");
-        }
-//        textViewArray.setText("");
+            if (success) {
+                connectedThread = new ConnectedThread(bluetoothSocket);
+                connectedThread.start();
 
-        graph.setVisibility(View.VISIBLE);
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
-        LineGraphSeries<DataPoint> series2 = new LineGraphSeries<>();
-        int size = doublesSo2.length;
-        for (int i2 = 10; i2 < size; i2++) {
-            DataPoint point = new DataPoint(i2, doublesSo2[i2] * 100);
-            series.appendData(point, true, size);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        showFrameLedControls();
+                    }
+                });
+            }
         }
-        for (int i2 = 10; i2 < size; i2++) {
-            DataPoint pointF = new DataPoint(i2, doublesSaCO[i2] * 100);
-            series2.appendData(pointF, true, size);
+
+        public boolean isConnect() {
+            return bluetoothSocket.isConnected();
         }
-        graph.getViewport().setMinX(10  );
-        graph.getViewport().setMaxX(size);
-        graph.getViewport().setMinY(-10);
-        graph.getViewport().setMaxY(110);
-        graph.getViewport().setYAxisBoundsManual(true);
-        graph.getViewport().setXAxisBoundsManual(true);
-        series.setColor(Color.BLACK);
-        series2.setColor(Color.RED);
-        graph.addSeries(series);
-        graph.addSeries(series2);
-        double sred=0;
-        for (int l=0;l<doublesSaCO.length;l++){
-            sred+=doublesSaCO[l];
-        }
-        sred=sred/doublesSaCO.length;
-        Log.i("sredCheck",sred+"");
-        if (sred>0.10) {
-            Toast.makeText(this,"Терміново к доктору", Toast.LENGTH_LONG).show();
+
+        public void cancel() {
+            try {
+                bluetoothSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
+
